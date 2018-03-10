@@ -3,6 +3,7 @@ package gudthing.serializability;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.ArrayList;
+import java.util.stream.Collectors;
 
 
 /**
@@ -40,9 +41,13 @@ public class Schedule {
      */
     private void populate(String[] schedule) {
         for (int i = 0; i < schedule.length; i++) {
-            String action = schedule[i].substring(0, 1);
-            int transaction = Integer.parseInt(schedule[i].substring(1, 2));
-            String item = schedule[i].substring(2);
+            int ACTION_START = 0;
+            int ACTION_END = 1;
+            int ITEM_START = schedule[i].length()-1;
+
+            String action = schedule[i].substring(ACTION_START, ACTION_END);
+            int transaction = Integer.parseInt(schedule[i].substring(ACTION_END, ITEM_START));
+            String item = schedule[i].substring(ITEM_START);
             append(action, transaction, item);
         }
         System.out.println(theSchedule.size());
@@ -82,30 +87,39 @@ public class Schedule {
         return schedule;
     }
 
-    public boolean dfs_r(HashSet<OperationConflict> _graph, Integer _start, HashSet<Integer> _visited, ArrayList<Integer> _path) {
-        _visited.add(_start);
+    private final boolean NO_CYCLE = false;
+    private final boolean HAS_CYCLE = true;
+
+    private String getStringPath(ArrayList<Integer> _path) {
+        String s = _path.stream().map(Object::toString).collect(Collectors.joining(","));
+        return s;
+    }
+
+    public boolean dfs_r(HashSet<OperationConflict> _graph, Integer _start, HashSet<Integer> _pathSet, ArrayList<Integer> _path, HashSet<Integer> _handled) {
+        if (_handled.contains(_start)) {
+            return NO_CYCLE;
+        }
+
+        _handled.add(_start);
+        _pathSet.add(_start);
+        _path.add(_start);
         System.out.println("Adding " + _start);
         for (OperationConflict edge : _graph) {
             if (edge.getFromOperation().getTransaction() == _start) {
-                System.out.println("handling edge " + edge.getFromOperation().getTransaction() + " -> " + edge.getToOperation().getTransaction());
-                _path.add(edge.getToOperation().getTransaction());
-                if (_visited.contains(edge.getToOperation().getTransaction())) {
-                    System.out.println("Found cycle:");
-                    for (Integer x : _path) {
-                        System.out.print(x+ " ");
-                    }
-                    System.out.println();
-                    return true;
+                System.out.println("Handling edge " + edge.getFromOperation().getTransaction() + " -> " + edge.getToOperation().getTransaction());
+                if (_pathSet.contains(edge.getToOperation().getTransaction())) {
+                    _path.add(edge.getToOperation().getTransaction());
+                    return HAS_CYCLE;
                 } else {
-                    if (dfs_r(_graph, edge.getToOperation().getTransaction(), _visited, _path)) {
-                        return true;
+                    if (dfs_r(_graph, edge.getToOperation().getTransaction(), _pathSet, _path, _handled)==HAS_CYCLE) {
+                        return HAS_CYCLE;
                     }
                 }
-                _path.remove((Integer)edge.getToOperation().getTransaction());
             }
         }
-        _visited.remove(_start);
-        return false;
+        _path.remove((Integer)_start);
+        _pathSet.remove(_start);
+        return NO_CYCLE;
     }
 
     /**
@@ -118,37 +132,19 @@ public class Schedule {
         String result = "Is Schedule Conflict-Serializable: ";
         HashSet<OperationConflict> conflicts = conflictSerializableTest();
         HashSet<Integer> visited = new HashSet<Integer>();
-        HashSet<Integer> handled = new HashSet<Integer>();
+        HashSet<Integer> handled = new HashSet<Integer>(); // Just to optimize the number of runs.
         ArrayList<Integer> path = new ArrayList<Integer>();
         for (OperationConflict i : conflicts) {
             int outerFrom = i.getFromOperation().getTransaction();
 
             if (!handled.contains(outerFrom)) {
-                handled.add(outerFrom);
-                path.add(outerFrom);
-
-                boolean hasCycle = dfs_r(conflicts, outerFrom, visited, path);
+                boolean hasCycle = dfs_r(conflicts, outerFrom, visited, path, handled) == HAS_CYCLE;
                 if (hasCycle) {
                     result += "False\n";
-                    //result += "There is a cycle between transactions: T" + outerFrom.getTransaction() + " and T" + innerFrom.getTransaction();
+                    result += "There is a cycle in: " + getStringPath(path);
                     return result;
                 }
-
-                path.remove((Integer)outerFrom);
-
             }
-            /*
-            Operation outerTo = i.getToOperation();
-            for (OperationConflict j : conflicts) {
-                Operation innerFrom = j.getFromOperation();
-                Operation innerTo = j.getToOperation();
-                //means schedule has a cycle, thus its conflict serailizable
-                if (outerFrom.equals(innerTo) && outerTo.equals(innerFrom)) {
-                    result += "False\n";
-                    result += "There is a cycle between transactions: T" + outerFrom.getTransaction() + " and T" + innerFrom.getTransaction();
-                    return result;
-                }
-            }*/
         }
         result += "True\n";
         result += "Schedule is acyclic, thus it's serializable.\n";
