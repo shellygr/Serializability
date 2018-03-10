@@ -131,14 +131,14 @@ public class Schedule {
     public String conflictSerializableSolution() {
         String result = "Is Schedule Conflict-Serializable: ";
         HashSet<OperationConflict> conflicts = conflictSerializableTest();
-        HashSet<Integer> visited = new HashSet<Integer>();
-        HashSet<Integer> handled = new HashSet<Integer>(); // Just to optimize the number of runs.
+        HashSet<Integer> pathSet = new HashSet<Integer>();
+        HashSet<Integer> handled = new HashSet<Integer>();
         ArrayList<Integer> path = new ArrayList<Integer>();
         for (OperationConflict i : conflicts) {
             int outerFrom = i.getFromOperation().getTransaction();
 
             if (!handled.contains(outerFrom)) {
-                boolean hasCycle = dfs_r(conflicts, outerFrom, visited, path, handled) == HAS_CYCLE;
+                boolean hasCycle = dfs_r(conflicts, outerFrom, pathSet, path, handled) == HAS_CYCLE;
                 if (hasCycle) {
                     result += "False\n";
                     result += "There is a cycle in: " + getStringPath(path);
